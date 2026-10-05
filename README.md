@@ -19,8 +19,10 @@ world through **MCP servers** for tools and **webhooks** for event-driven activa
 Every fact an agent learns is written to **Postgres** with provenance, so memory is
 queried, versioned and joined — not grepped out of a blob of markdown. Inference is
 local and split by workload: **Qwen 3.8 on the RTX 5090** for orchestration and deep
-reasoning, **Gemma 4 on the Mac mini** for conversational surfaces. Marginal cost per
-token: zero.
+reasoning, **Gemma 4 on the Mac mini** for conversational surfaces. All of it sits
+behind **Manifest Gateway**, a single routing plane that sends each request to the
+local model, a subscription, or a metered cloud API depending on the task — with
+fallback and per-request cost attribution built in. Marginal cost per token: zero.
 
 ---
 
@@ -39,7 +41,8 @@ token: zero.
 
 **Mac mini M4 (24 GB)** runs the always-on control plane — orchestrator, memory,
 tools, scheduling — at ~10 W. **PC + RTX 5090 (32 GB VRAM)** runs the heavy inference
-model at 1,792 GB/s, waking on demand.
+model at 1,792 GB/s, waking on demand. **Manifest Gateway** sits in front of both,
+plus a cloud lane, and decides per request which one serves it.
 
 ---
 

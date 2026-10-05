@@ -125,25 +125,34 @@ base grows to millions of rows.
 
 ## 3. Inference routing
 
-Two hosts, one logical inference plane. The GPU host serves the heavy model; the
-control plane serves the conversational one locally.
+Two hosts and one cloud lane, mediated by a single gateway. The GPU host serves the
+heavy model; the control plane serves the conversational one locally; the cloud lane
+exists for bursts, escalation and fallback.
 
 ```
-request ──▶ classify ──┬── orchestration / planning / synthesis ──▶ Qwen 3.8
-                       │                                            (PC + RTX 5090)
-                       ├── conversation / briefing / summary  ────▶ Gemma 4
-                       │                                            (Mac mini, local)
-                       └── explicit escalation ──────────────────▶ hosted frontier
-                                                                  (opt-in, cost-logged)
+request ──▶ MANIFEST GATEWAY ──┬── orchestration / planning / synthesis ──▶ Qwen 3.8
+           (one endpoint,      │                                            (PC + RTX 5090)
+            one policy)        │
+                               ├── conversation / briefing / summary  ────▶ Gemma 4
+                               │                                            (Mac mini, local)
+                               │
+                               ├── explicit escalation ──────────────────▶ hosted frontier
+                               │                                          (opt-in, cost-logged)
+                               │
+                               └── fallback if the GPU host is absent ──▶ cloud lane
+                                                                          (never silent)
 ```
 
 - **Qwen 3.8 lives on the GPU host** — ~15–20 GB of 32 GB VRAM, leaving room for a
   long KV cache. 1,792 GB/s of bandwidth is what makes it fast.
 - **Gemma 4 lives on the control plane** — ~14 GB resident in 24 GB, so conversational
   turns need no network hop and no GPU wake-up.
-- Each agent declares its default lane; the orchestrator may override per task.
+- **The gateway owns the policy.** Routing rules, the fallback ladder, request repair
+  and cost attribution are gateway configuration — not logic duplicated in each agent.
+  Adding a model or changing a lane is a config change, not a code change.
 - Escalation to a hosted model is **explicit and logged** — never silent, so cost
-  surprises stay impossible.
+  surprises stay impossible; the gateway's per-request accounting is what makes that
+  claim checkable rather than aspirational.
 
 ### 3.1 Crossing the machine boundary
 
@@ -250,8 +259,10 @@ webhooks for everything else.
 
 | Failure | Behaviour | Mitigation |
 |---|---|---|
-| Inference host unavailable | Orchestrator degrades to local Gemma 4 or fails the task explicitly | Health probe before routing; never a silent pretend-success |
+| Gateway unavailable | All model calls fail — it is the single routing point | Supervised + restartable; health-checked by the control plane; the highest-priority service to recover |
+| Inference host unavailable | Gateway falls back down the ladder to the cloud lane rather than failing the task | Health probe before routing; fallback is gateway config, not agent logic |
 | Inference link degraded | Requests time out against a defined budget | LAN + mTLS; cold-start latency budgeted per task class |
+| Cloud lane unavailable | Gateway routes back to local capacity | Fallback ladder is bidirectional, not one-way |
 | Control plane (Mac mini) down | Fleet is down — it holds memory, scheduling and orchestration | Backups of the Postgres store; GPU host is not the bottleneck |
 | Local model unavailable | Requests fail fast; nothing is silently downgraded | Health check + explicit escalation path |
 | Postgres unavailable | Agents degrade to **read-only** | Storage on the control plane; no silent writes |

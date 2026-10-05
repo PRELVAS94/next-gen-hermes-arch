@@ -46,20 +46,24 @@ PostgreSQL as the memory substrate; MCP for tools; webhooks for event-driven wor
                         │  episodic log · task state · audit       │
                         └──────────────────────────────────────────┘
 
-   ══════════════════ control plane ═╪═ inference plane ═════════════════
+   ══════════════════ control plane (Mac mini) ══════════════════════════
 
-   ┌───────────────────────────────┐  │  ┌──────────────────────────────┐
-   │  MAC MINI M4 · 24 GB          │  │  │  PC + RTX 5090 · 32 GB       │
-   │  170 GB/s · ~10 W always-on   │  │  │  1,792 GB/s · 575 W TDP      │
-   │  CONTROL PLANE                │◀─┼─▶│  INFERENCE PLANE             │
-   │                               │  │  │                              │
-   │  GEMMA 4 (26B-A4B, ~4B active)│  │  │  QWEN 3.8                    │
-   │  conversation · briefings     │  │  │  orchestration · planning    │
-   │  summarisation · chat surfaces│  │  │  deep reasoning · synthesis  │
-   │  ~14 GB resident              │  │  │  ~15–20 GB + long KV cache   │
-   └───────────────────────────────┘  │  └──────────────────────────────┘
-     orchestration · memory · tools   │    dedicated GPU inference,
-     scheduling · always available    │    wake-on-demand
+                        ┌───────────────┴──────────────────────────┐
+                        │  MANIFEST GATEWAY — inference routing    │
+                        │  ONE OpenAI-compatible endpoint for the  │
+                        │  whole fleet · model:"auto" · fallback   │
+                        │  ladder · per-route params · token and   │
+                        │  cost observability                      │
+                        └──┬───────────────┬──────────────┬────────┘
+                           │               │              │
+        ┌──────────────────┴──┐ ┌──────────┴────────┐ ┌───┴────────────────┐
+        │  GEMMA 4            │ │  QWEN 3.8         │ │  CLOUD LANE        │
+        │  Mac mini · resident│ │  PC + RTX 5090    │ │  OpenRouter · xAI  │
+        │  26B-A4B, ~4B active│ │  wake-on-demand   │ │  keys + subs       │
+        │  ~14 GB · 170 GB/s  │ │  ~15–20 GB of 32  │ │  frontier escape   │
+        │  conversation·chat  │ │  deep reasoning   │ │  hatch + fallback  │
+        └─────────────────────┘ └───────────────────┘ └────────────────────┘
+           ~10 W, always on        575 W, sleeps         metered, last resort
 ```
 
 ## 3. Why two machines, and why these two
@@ -97,7 +101,77 @@ high-frequency conversational surfaces, where fluency matters more than depth. E
 model is resident on its own host, so there is no swap penalty between a chat turn and
 an orchestration turn.
 
-## 4. The memory substrate
+## 4. The routing plane — Manifest Gateway
+
+Between the agents and every model sits **one** gateway. [Manifest](https://manifest.build)
+is an open-source LLM gateway (self-hosted, Docker) that exposes a single
+OpenAI-compatible endpoint in front of many backends. It is the component that makes
+"cloud or local, depending on the task" a routing *policy* rather than scattered
+per-agent logic.
+
+### 4.1 What it unifies
+
+The gateway fronts four kinds of backend **simultaneously** — the exact mix this design
+needs:
+
+| Backend kind | In this design | Why it matters here |
+|---|---|---|
+| **Local server** | Qwen 3.8 (RTX 5090), Gemma 4 (Mac mini) via Ollama / llama.cpp | The privacy and zero-marginal-cost lane |
+| **API keys** | OpenRouter, plus any direct provider | Burst capacity and frontier capability |
+| **Provider subscriptions** | Subscription-based access used as-is | Reuses capacity already paid for rather than re-buying per token |
+| **Custom OpenAI-compatible endpoints** | Any bespoke or self-built server | Escape hatch for future local or private models |
+
+Every backend is reached the same way, so an agent can mix local, subscription and
+metered models transparently — no per-agent provider code.
+
+### 4.2 How routing decisions are made
+
+```
+agent request
+     │
+     ▼
+Manifest Gateway ── policy ──┬─▶ local  (privacy / zero marginal cost)  ← default
+     │                       ├─▶ subscription (already-paid capacity)
+     │                       ├─▶ metered API (burst, frontier capability)
+     │                       └─▶ escalation (a step the local model can't carry)
+     │
+     ├─ fallback ladder: provider A → provider B → local, per request
+     ├─ autofix: repair malformed upstream requests instead of failing the run
+     └─ observability: every request, token and cost — per agent, key, provider
+```
+
+The policy the gateway enforces:
+
+1. **Local first.** Anything the local models can carry stays local — that is the
+   cost and privacy default.
+2. **Escalate on need, not on habit.** A step the local model can't carry is routed to
+   the cloud lane *explicitly and observably*, never silently.
+3. **Fall back in order.** If the RTX host is unavailable, the ladder steps to the
+   cloud lane rather than failing the task — this is what makes the second-machine
+   topology safe to run.
+4. **Never a surprise bill.** Because every request is attributed to an agent and a
+   provider, metered spend is visible per call instead of discovered at month end.
+
+### 4.3 Why not just call providers directly
+
+Four reasons, each of which the design would otherwise have to build itself:
+
+- **One endpoint, many backends.** Adding or swapping a model is a gateway config
+  change, not a code change in six agents.
+- **Fallback and repair are infrastructure concerns.** Retry ladders, provider outages
+  and malformed-request repair belong in a proxy, not in agent prompts.
+- **Cost attribution comes free.** Per-agent, per-key token accounting is exactly the
+  instrumentation this design otherwise has to hand-roll — and it directly serves the
+  efficiency claims in [`COST_MODEL.md`](COST_MODEL.md).
+- **It keeps the routing policy honest.** With one choke point, "local first, cloud on
+  exception" is a rule the system *enforces* and *logs*, rather than an intention each
+  agent is trusted to follow.
+
+*Note:* the gateway is the control-plane component that makes this policy real. Local
+servers it routes to still live on their own hosts, so the two-machine split is
+unchanged — the gateway decides *where* a request goes, not where the models run.
+
+## 5. The memory substrate
 
 `MEMORY.md`-style files are replaced by a relational store. The short version of why:
 
@@ -114,7 +188,7 @@ The deployed fleet this models runs at **~97% input tokens**. "Retrieve precisel
 instead of re-reading everything" is therefore the architecture's biggest single
 efficiency win. Full schema in [`LLD.md`](LLD.md).
 
-## 5. How work enters the system
+## 6. How work enters the system
 
 Three entry paths, deliberately distinct:
 
@@ -128,7 +202,7 @@ Three entry paths, deliberately distinct:
    is doubly valuable, because a wake-up can also *power on the GPU host*. The agent
    runs — and the expensive silicon wakes — only when something actually happened.
 
-## 6. Why MCP matters here
+## 7. Why MCP matters here
 
 MCP (Model Context Protocol) makes tools a **standard interface** rather than
 bespoke code per integration. Practically: an agent can be handed a new capability
@@ -136,7 +210,7 @@ without touching agent logic, and the runtime can itself be exposed *as* an MCP 
 so other agents or IDEs can drive it. It is the difference between seven scripts that
 each know how to call the web, and one system where capability is a plugin.
 
-## 7. Cost shape
+## 8. Cost shape
 
 See [`COST_MODEL.md`](COST_MODEL.md) for the arithmetic. In one line:
 **capex × amortisation + electricity**, largely independent of volume — versus a
@@ -144,7 +218,7 @@ metered bill that scales with every token and is capped by rate limits. The spli
 design lowers capex *and* lowers the power bill, because the high-draw GPU sits idle
 most of the day.
 
-## 8. Honest limitations
+## 9. Honest limitations
 
 Stated because a design document that only lists strengths is marketing, not
 engineering.
@@ -161,6 +235,11 @@ engineering.
 - **24 GB is a hard ceiling on the control plane.** The Mac mini runs Gemma 4
   comfortably and Qwen 3.8 *not* comfortably — that constraint is exactly why the
   design is two machines rather than one.
+- **The gateway is a single routing point, and a single point of failure.** Every model
+  call passes through it, so it must be supervised and restartable, and its own health
+  is part of the control plane's monitoring. That is a real cost of the simplification —
+  accepted because one configurable choke point beats six agents each implementing
+  their own provider logic and fallbacks.
 - **Memory quality is the real risk.** A relational store makes retrieval precise;
   it does not make what you stored *correct*. Extraction and confidence scoring need
   as much care as the schema.

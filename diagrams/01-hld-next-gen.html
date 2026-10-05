@@ -33,12 +33,12 @@
 <h1>Next-Gen Hermes Architecture <span>— Local-First, Postgres-Backed</span></h1>
 <div class="sub">
   Orchestrator + six specialised agents · memory as a relational store, not markdown files<br>
-  Two machines: a Mac&nbsp;mini&nbsp;M4 control plane at ~10&nbsp;W · an RTX&nbsp;5090 inference host, wake-on-demand<br>
-  MCP tool plane · webhook event plane · zero marginal cost per token
+  Mac&nbsp;mini&nbsp;M4 control plane (~10&nbsp;W, always on) + RTX&nbsp;5090 inference host + cloud lane<br>
+  Manifest Gateway routes every request · MCP tool plane · webhook event plane
 </div>
 <div class="rule"></div>
 
-<svg viewBox="0 0 1240 880" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+<svg viewBox="0 0 1240 982" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Inter,Helvetica,Arial,sans-serif">
 
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
@@ -84,9 +84,48 @@
   <path d="M620,412 L620,440" stroke="#7dd3fc" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
   <path d="M620,512 L620,540" stroke="#c4b5fd" stroke-width="2" fill="none" marker-end="url(#ar3)"/>
 
-  <path d="M620,656 L620,692" stroke="#fcd34d" stroke-width="2.4" fill="none" marker-end="url(#ar4)"/>
-  <text x="636" y="678" fill="#fcd34d" font-size="11" font-weight="600">mTLS inference call · LAN only</text>
+  <!-- ===== INFERENCE ROUTING — MANIFEST GATEWAY ===== -->
+  <path d="M620,656 L620,676" stroke="#fcd34d" stroke-width="2.4" fill="none"/>
+  <path d="M240,676 L1000,676" stroke="#fcd34d" stroke-width="2.4" fill="none"/>
+  <path d="M240,676 L240,700" stroke="#fcd34d" stroke-width="2.4" fill="none" marker-end="url(#ar4)"/>
+  <path d="M620,676 L620,700" stroke="#fcd34d" stroke-width="2.4" fill="none" marker-end="url(#ar4)"/>
+  <path d="M1000,676 L1000,700" stroke="#fcd34d" stroke-width="2.4" fill="none" marker-end="url(#ar4)"/>
+  <text x="650" y="669" fill="#fcd34d" font-size="11" font-weight="600">routed per request · local first · fallback · cost-logged</text>
 
+  <!-- ===== MANIFEST GATEWAY BAND ===== -->
+  <rect x="150" y="704" width="940" height="78" rx="11" fill="#0f172a" stroke="#fcd34d" stroke-width="1.6"/>
+  <rect x="150" y="704" width="940" height="78" rx="11" fill="#fcd34d" opacity="0.09"/>
+  <text x="620" y="729" fill="#fcd34d" font-size="14" font-weight="700" text-anchor="middle">MANIFEST GATEWAY — inference routing plane</text>
+  <text x="620" y="750" fill="#e6edf7" font-size="11.5" text-anchor="middle">ONE OpenAI-compatible endpoint · local models · API keys · subscriptions · custom endpoints</text>
+  <text x="620" y="768" fill="#93a4c0" font-size="11" text-anchor="middle">model:"auto" routing · fallback ladder · request autofix · per-request token &amp; cost attribution</text>
+
+  <!-- ===== THREE LANES ===== -->
+  <rect x="150" y="808" width="290" height="150" rx="12" fill="#0f172a" stroke="#5eead4" stroke-width="1.5"/>
+  <rect x="150" y="808" width="290" height="150" rx="12" fill="#5eead4" opacity="0.06"/>
+  <text x="295" y="832" fill="#5eead4" font-size="13" font-weight="700" text-anchor="middle">LOCAL · MAC MINI M4</text>
+  <text x="295" y="854" fill="#e6edf7" font-size="12" font-weight="600" text-anchor="middle">GEMMA 4 · 26B-A4B</text>
+  <text x="295" y="874" fill="#93a4c0" font-size="10.5" text-anchor="middle">~14 GB resident · 24 GB unified</text>
+  <text x="295" y="893" fill="#93a4c0" font-size="10.5" text-anchor="middle">~170 GB/s · ~10 W always-on</text>
+  <text x="295" y="918" fill="#e6edf7" font-size="11" text-anchor="middle">conversation · briefings · summarisation</text>
+  <text x="295" y="938" fill="#93a4c0" font-size="10.5" text-anchor="middle">the default for chat-shaped work</text>
+
+  <rect x="475" y="808" width="290" height="150" rx="12" fill="#0f172a" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="475" y="808" width="290" height="150" rx="12" fill="#fcd34d" opacity="0.07"/>
+  <text x="620" y="832" fill="#fcd34d" font-size="13" font-weight="700" text-anchor="middle">LOCAL · PC + RTX 5090</text>
+  <text x="620" y="854" fill="#e6edf7" font-size="12" font-weight="600" text-anchor="middle">QWEN 3.8</text>
+  <text x="620" y="874" fill="#93a4c0" font-size="10.5" text-anchor="middle">~15–20 GB of 32 GB VRAM</text>
+  <text x="620" y="893" fill="#93a4c0" font-size="10.5" text-anchor="middle">1,792 GB/s · 575 W · wake-on-demand</text>
+  <text x="620" y="918" fill="#e6edf7" font-size="11" text-anchor="middle">planning · deep reasoning · synthesis</text>
+  <text x="620" y="938" fill="#93a4c0" font-size="10.5" text-anchor="middle">the heavy lane — sleeps between jobs</text>
+
+  <rect x="800" y="808" width="290" height="150" rx="12" fill="#0f172a" stroke="#7dd3fc" stroke-width="1.5"/>
+  <rect x="800" y="808" width="290" height="150" rx="12" fill="#7dd3fc" opacity="0.06"/>
+  <text x="945" y="832" fill="#7dd3fc" font-size="13" font-weight="700" text-anchor="middle">CLOUD LANE</text>
+  <text x="945" y="854" fill="#e6edf7" font-size="12" font-weight="600" text-anchor="middle">metered APIs · subscriptions</text>
+  <text x="945" y="874" fill="#93a4c0" font-size="10.5" text-anchor="middle">OpenRouter · xAI · direct providers</text>
+  <text x="945" y="893" fill="#93a4c0" font-size="10.5" text-anchor="middle">already-paid capacity, reused</text>
+  <text x="945" y="918" fill="#e6edf7" font-size="11" text-anchor="middle">frontier escape hatch · burst · fallback</text>
+  <text x="945" y="938" fill="#93a4c0" font-size="10.5" text-anchor="middle">never silent — every call cost-logged</text>
   <!-- ===== INPUTS ===== -->
   <rect x="182" y="66" width="180" height="48" rx="9" fill="#131e35" stroke="#22304d"/>
   <text x="272" y="86" fill="#e6edf7" font-size="12.5" font-weight="600" text-anchor="middle">Conversational</text>
@@ -148,36 +187,26 @@
   <text x="620" y="588" fill="#e6edf7" font-size="11.5" text-anchor="middle">bitemporal facts · provenance &amp; confidence · pgvector embeddings · episodic log · task fabric</text>
   <text x="620" y="604" fill="#93a4c0" font-size="11" text-anchor="middle">retrieved by QUERY, not injected whole — memory grows to millions of rows, context stays flat</text>
 
-  <!-- ===== INFERENCE HOST ===== -->
-  <rect x="210" y="692" width="820" height="164" rx="12" fill="#0f172a" stroke="#fcd34d" stroke-width="1.6"/>
-  <rect x="210" y="692" width="820" height="164" rx="12" fill="#fcd34d" opacity="0.075"/>
-
-  <text x="620" y="720" fill="#fcd34d" font-size="14.5" font-weight="700" text-anchor="middle">PC + RTX 5090 · 32 GB GDDR7 · 1,792 GB/s</text>
-  <text x="620" y="740" fill="#93a4c0" font-size="11" text-anchor="middle">INFERENCE PLANE — wake-on-demand · 575 W TDP · sleeps between jobs</text>
-
-  <text x="620" y="772" fill="#fcd34d" font-size="13.5" font-weight="700" text-anchor="middle">QWEN 3.8</text>
-  <text x="620" y="794" fill="#e6edf7" font-size="11.5" text-anchor="middle">orchestration · planning · long-horizon reasoning · synthesis</text>
-  <text x="620" y="814" fill="#93a4c0" font-size="11" text-anchor="middle">~15–20 GB of 32 GB VRAM, leaving room for a long KV cache</text>
-  <text x="620" y="834" fill="#93a4c0" font-size="11" text-anchor="middle">the heavy model takes the bandwidth — token generation tracks memory speed</text>
+  <!-- ===== INFERENCE HOST (represented by the lane boxes above) ===== -->
 </svg>
 
 <div class="legendrow">
   <span><span class="sw" style="background:#5eead4"></span><b>Control / routing</b> — intent to agents</span>
   <span><span class="sw" style="background:#7dd3fc"></span><b>Tool plane</b> — MCP calls out</span>
   <span><span class="sw" style="background:#c4b5fd"></span><b>Memory plane</b> — reads &amp; writes</span>
-  <span><span class="sw" style="background:#fcd34d"></span><b>Inference</b> — LAN, mTLS</span>
+  <span><span class="sw" style="background:#fcd34d"></span><b>Inference</b> — gateway-routed</span>
 </div>
 
 <div class="card">
   <h3>The three claims</h3>
   <p><b>1. Relational memory beats flat files.</b> Facts are rows with validity windows and provenance, so memory is <i>queried</i> — current truth is one predicate away, and contradictions between two stored beliefs become detectable instead of invisible. Corrections supersede rather than overwrite.</p>
-  <p style="margin-top:8px"><b>2. Split the silicon by bandwidth.</b> Token generation is memory-bandwidth-bound, not compute-bound — so the heavy model takes the GPU's 1,792 GB/s, and always-on orchestration sits on Apple silicon at ~10 W. The control plane costs about €18/year to run; the 575 W GPU host sleeps until a task needs real reasoning.</p>
+  <p style="margin-top:8px"><b>2. Split the silicon by bandwidth, and route by policy.</b> Token generation is memory-bandwidth-bound, not compute-bound — so the heavy model takes the GPU's 1,792 GB/s, and always-on orchestration sits on Apple silicon at ~10 W (≈€18/year). Manifest Gateway then decides per request: local first, cloud only when the task needs it, with the fallback ladder and cost attribution enforced centrally instead of promised per agent.</p>
   <p style="margin-top:8px"><b>3. MCP + webhooks make it a system.</b> MCP standardises tools; webhooks invert "agent polls" into "event wakes agent" — and here the wake-up can power on the inference host too. In the deployed fleet, 172 of 314 weekly runs produced no output at all.</p>
 </div>
 
 <div class="card">
   <h3>Honest trade-offs</h3>
-  <p>Two machines mean a network is now in the path — mTLS on the LAN, health-probed, degrading explicitly rather than silently if the inference host is unavailable. A 575 W card is a real power draw, so wake-on-demand is a requirement rather than a nicety. Local models still trail frontier models on the hardest reasoning, so a burst escape hatch stays in the design. And a relational store makes retrieval <i>precise</i>; it does not make what you stored <i>correct</i>.</p>
+  <p>Two machines mean a network is in the path — mTLS on the LAN, health-probed, degrading explicitly rather than silently. The gateway is a single routing point, so it must itself be supervised and restartable: one choke point is simpler than six agents each implementing fallbacks, but it is also a single point of failure. A 575 W card is a real draw, so wake-on-demand is a requirement, not a nicety. Local models still trail frontier models on the hardest reasoning, so a burst escape hatch stays in the design. And a relational store makes retrieval <i>precise</i>; it does not make what you stored <i>correct</i>.</p>
 </div>
 
 </body>
