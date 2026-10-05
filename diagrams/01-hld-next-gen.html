@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Next-Gen Hermes Architecture — HLD</title>
+<style>
+  :root{
+    --bg:#0b1120; --panel:#0f172a; --line:#22304d; --txt:#e6edf7; --dim:#93a4c0;
+    --accent:#5eead4; --accent2:#7dd3fc; --violet:#c4b5fd; --amber:#fcd34d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+       padding:30px 34px 26px}
+  h1{font-size:27px;font-weight:700;letter-spacing:-.3px}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--dim);font-size:13.5px;margin-top:7px;line-height:1.5}
+  .rule{height:1px;background:linear-gradient(90deg,var(--accent),transparent);margin:18px 0 20px}
+  svg{display:block;width:100%;height:auto}
+  .legendrow{display:flex;gap:24px;flex-wrap:wrap;margin-top:18px;
+             padding-top:15px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .legendrow b{color:var(--txt);font-weight:600}
+  .sw{display:inline-block;width:22px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px;margin-top:15px}
+  .card h3{font-size:13px;color:var(--accent2);margin-bottom:7px;letter-spacing:.3px;text-transform:uppercase}
+  .card p{font-size:13px;color:var(--dim);line-height:1.6}
+  .card b{color:var(--txt)}
+  .card + .card h3{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<h1>Next-Gen Hermes Architecture <span>— Local-First, Postgres-Backed</span></h1>
+<div class="sub">
+  Orchestrator + six specialised agents · memory as a relational store, not markdown files<br>
+  Two machines: a Mac&nbsp;mini&nbsp;M4 control plane at ~10&nbsp;W · an RTX&nbsp;5090 inference host, wake-on-demand<br>
+  MCP tool plane · webhook event plane · zero marginal cost per token
+</div>
+<div class="rule"></div>
+
+<svg viewBox="0 0 1240 880" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/>
+    </marker>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7dd3fc"/>
+    </marker>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c4b5fd"/>
+    </marker>
+    <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#fcd34d"/>
+    </marker>
+  </defs>
+
+  <!-- ===== CONTROL PLANE ENCLOSURE ===== -->
+  <rect x="28" y="8" width="1184" height="648" rx="14" fill="#0f172a" stroke="#5eead4" stroke-width="1.3" stroke-dasharray="7 4"/>
+  <rect x="28" y="8" width="1184" height="648" rx="14" fill="#5eead4" opacity="0.035"/>
+  <text x="52" y="33" fill="#5eead4" font-size="13.5" font-weight="700">MAC MINI M4 · 24 GB UNIFIED MEMORY · ~10 W ALWAYS-ON</text>
+  <text x="52" y="51" fill="#93a4c0" font-size="11.5">CONTROL PLANE — orchestration · memory · tools · scheduling</text>
+
+  <rect x="842" y="16" width="352" height="40" rx="9" fill="#131e35" stroke="#5eead4" stroke-width="1"/>
+  <text x="1018" y="33" fill="#5eead4" font-size="11.5" font-weight="700" text-anchor="middle">GEMMA 4 · 26B-A4B · ~14 GB resident</text>
+  <text x="1018" y="48" fill="#93a4c0" font-size="10.5" text-anchor="middle">conversation · briefings · summarisation</text>
+
+  <!-- ===== ARROWS ===== -->
+  <path d="M272,114 L272,146" stroke="#5eead4" stroke-width="2" fill="none"/>
+  <path d="M552,114 L552,146" stroke="#7dd3fc" stroke-width="2" fill="none"/>
+  <path d="M832,114 L832,146" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+  <path d="M272,146 L832,146" stroke="#5eead4" stroke-width="2" fill="none"/>
+  <path d="M552,146 L552,172" stroke="#5eead4" stroke-width="2.2" fill="none" marker-end="url(#ar)"/>
+
+  <path d="M620,254 L620,280" stroke="#5eead4" stroke-width="2.5" fill="none"/>
+  <path d="M135,280 L1105,280" stroke="#5eead4" stroke-width="2.5" fill="none"/>
+  <path d="M135,280 L135,312"  stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <path d="M329,280 L329,312"  stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <path d="M523,280 L523,312"  stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <path d="M717,280 L717,312"  stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <path d="M911,280 L911,312"  stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <path d="M1105,280 L1105,312" stroke="#5eead4" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+
+  <path d="M620,412 L620,440" stroke="#7dd3fc" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
+  <path d="M620,512 L620,540" stroke="#c4b5fd" stroke-width="2" fill="none" marker-end="url(#ar3)"/>
+
+  <path d="M620,656 L620,692" stroke="#fcd34d" stroke-width="2.4" fill="none" marker-end="url(#ar4)"/>
+  <text x="636" y="678" fill="#fcd34d" font-size="11" font-weight="600">mTLS inference call · LAN only</text>
+
+  <!-- ===== INPUTS ===== -->
+  <rect x="182" y="66" width="180" height="48" rx="9" fill="#131e35" stroke="#22304d"/>
+  <text x="272" y="86" fill="#e6edf7" font-size="12.5" font-weight="600" text-anchor="middle">Conversational</text>
+  <text x="272" y="102" fill="#93a4c0" font-size="10.5" text-anchor="middle">chat platforms</text>
+
+  <rect x="462" y="66" width="180" height="48" rx="9" fill="#131e35" stroke="#22304d"/>
+  <text x="552" y="86" fill="#e6edf7" font-size="12.5" font-weight="600" text-anchor="middle">Webhook events</text>
+  <text x="552" y="102" fill="#93a4c0" font-size="10.5" text-anchor="middle">wake-on-event</text>
+
+  <rect x="742" y="66" width="180" height="48" rx="9" fill="#131e35" stroke="#22304d"/>
+  <text x="832" y="86" fill="#e6edf7" font-size="12.5" font-weight="600" text-anchor="middle">Schedules</text>
+  <text x="832" y="102" fill="#93a4c0" font-size="10.5" text-anchor="middle">cron · recurring work</text>
+
+  <!-- ===== ORCHESTRATOR ===== -->
+  <rect x="380" y="172" width="480" height="82" rx="11" fill="#0f172a" stroke="#5eead4" stroke-width="1.6"/>
+  <rect x="380" y="172" width="480" height="82" rx="11" fill="#5eead4" opacity="0.11"/>
+  <text x="620" y="198" fill="#5eead4" font-size="15" font-weight="700" text-anchor="middle">ORCHESTRATOR AGENT</text>
+  <text x="620" y="218" fill="#e6edf7" font-size="11.5" text-anchor="middle">classifies intent · decomposes cross-domain work · routes to specialists</text>
+  <text x="620" y="237" fill="#93a4c0" font-size="11.5" text-anchor="middle">verifies output · synthesises ONE answer · owns the task fabric</text>
+
+  <!-- ===== AGENTS ===== -->
+  <g text-anchor="middle">
+    <rect x="75" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="135" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">RESEARCH</text>
+    <text x="135" y="380" fill="#93a4c0" font-size="10.5">deep dives</text>
+
+    <rect x="269" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="329" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">NEWS</text>
+    <text x="329" y="380" fill="#93a4c0" font-size="10.5">briefings</text>
+
+    <rect x="463" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="523" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">FINANCE</text>
+    <text x="523" y="380" fill="#93a4c0" font-size="10.5">portfolio</text>
+
+    <rect x="657" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="717" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">ENGINEER</text>
+    <text x="717" y="380" fill="#93a4c0" font-size="10.5">code · SDLC</text>
+
+    <rect x="851" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="911" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">BOOKS</text>
+    <text x="911" y="380" fill="#93a4c0" font-size="10.5">reading</text>
+
+    <rect x="1045" y="312" width="120" height="100" rx="9" fill="#131e35" stroke="#22304d"/>
+    <text x="1105" y="362" fill="#e6edf7" font-size="12.5" font-weight="600">GAMING</text>
+    <text x="1105" y="380" fill="#93a4c0" font-size="10.5">session intel</text>
+  </g>
+
+  <!-- ===== MCP ===== -->
+  <rect x="75" y="440" width="1090" height="72" rx="11" fill="#0f172a" stroke="#7dd3fc" stroke-width="1.6"/>
+  <rect x="75" y="440" width="1090" height="72" rx="11" fill="#7dd3fc" opacity="0.10"/>
+  <text x="620" y="466" fill="#7dd3fc" font-size="14" font-weight="700" text-anchor="middle">MCP TOOL PLANE — Model Context Protocol</text>
+  <text x="620" y="488" fill="#e6edf7" font-size="11.5" text-anchor="middle">web · filesystem · shell · database · calendar · mail · browser automation</text>
+  <text x="620" y="504" fill="#93a4c0" font-size="11" text-anchor="middle">one standard interface — capability is a plugin, not bespoke glue</text>
+
+  <!-- ===== POSTGRES ===== -->
+  <rect x="75" y="540" width="1090" height="72" rx="11" fill="#0f172a" stroke="#c4b5fd" stroke-width="1.6"/>
+  <rect x="75" y="540" width="1090" height="72" rx="11" fill="#c4b5fd" opacity="0.10"/>
+  <text x="620" y="566" fill="#c4b5fd" font-size="14" font-weight="700" text-anchor="middle">MEMORY SUBSTRATE — PostgreSQL</text>
+  <text x="620" y="588" fill="#e6edf7" font-size="11.5" text-anchor="middle">bitemporal facts · provenance &amp; confidence · pgvector embeddings · episodic log · task fabric</text>
+  <text x="620" y="604" fill="#93a4c0" font-size="11" text-anchor="middle">retrieved by QUERY, not injected whole — memory grows to millions of rows, context stays flat</text>
+
+  <!-- ===== INFERENCE HOST ===== -->
+  <rect x="210" y="692" width="820" height="164" rx="12" fill="#0f172a" stroke="#fcd34d" stroke-width="1.6"/>
+  <rect x="210" y="692" width="820" height="164" rx="12" fill="#fcd34d" opacity="0.075"/>
+
+  <text x="620" y="720" fill="#fcd34d" font-size="14.5" font-weight="700" text-anchor="middle">PC + RTX 5090 · 32 GB GDDR7 · 1,792 GB/s</text>
+  <text x="620" y="740" fill="#93a4c0" font-size="11" text-anchor="middle">INFERENCE PLANE — wake-on-demand · 575 W TDP · sleeps between jobs</text>
+
+  <text x="620" y="772" fill="#fcd34d" font-size="13.5" font-weight="700" text-anchor="middle">QWEN 3.8</text>
+  <text x="620" y="794" fill="#e6edf7" font-size="11.5" text-anchor="middle">orchestration · planning · long-horizon reasoning · synthesis</text>
+  <text x="620" y="814" fill="#93a4c0" font-size="11" text-anchor="middle">~15–20 GB of 32 GB VRAM, leaving room for a long KV cache</text>
+  <text x="620" y="834" fill="#93a4c0" font-size="11" text-anchor="middle">the heavy model takes the bandwidth — token generation tracks memory speed</text>
+</svg>
+
+<div class="legendrow">
+  <span><span class="sw" style="background:#5eead4"></span><b>Control / routing</b> — intent to agents</span>
+  <span><span class="sw" style="background:#7dd3fc"></span><b>Tool plane</b> — MCP calls out</span>
+  <span><span class="sw" style="background:#c4b5fd"></span><b>Memory plane</b> — reads &amp; writes</span>
+  <span><span class="sw" style="background:#fcd34d"></span><b>Inference</b> — LAN, mTLS</span>
+</div>
+
+<div class="card">
+  <h3>The three claims</h3>
+  <p><b>1. Relational memory beats flat files.</b> Facts are rows with validity windows and provenance, so memory is <i>queried</i> — current truth is one predicate away, and contradictions between two stored beliefs become detectable instead of invisible. Corrections supersede rather than overwrite.</p>
+  <p style="margin-top:8px"><b>2. Split the silicon by bandwidth.</b> Token generation is memory-bandwidth-bound, not compute-bound — so the heavy model takes the GPU's 1,792 GB/s, and always-on orchestration sits on Apple silicon at ~10 W. The control plane costs about €18/year to run; the 575 W GPU host sleeps until a task needs real reasoning.</p>
+  <p style="margin-top:8px"><b>3. MCP + webhooks make it a system.</b> MCP standardises tools; webhooks invert "agent polls" into "event wakes agent" — and here the wake-up can power on the inference host too. In the deployed fleet, 172 of 314 weekly runs produced no output at all.</p>
+</div>
+
+<div class="card">
+  <h3>Honest trade-offs</h3>
+  <p>Two machines mean a network is now in the path — mTLS on the LAN, health-probed, degrading explicitly rather than silently if the inference host is unavailable. A 575 W card is a real power draw, so wake-on-demand is a requirement rather than a nicety. Local models still trail frontier models on the hardest reasoning, so a burst escape hatch stays in the design. And a relational store makes retrieval <i>precise</i>; it does not make what you stored <i>correct</i>.</p>
+</div>
+
+</body>
+</html>
